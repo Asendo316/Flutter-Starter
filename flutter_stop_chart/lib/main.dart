@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_circular_chart/flutter_circular_chart.dart';
 
 void main() => runApp(MyApp());
 
@@ -25,13 +26,18 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   Stopwatch watch = new Stopwatch();
   Timer timer;
+  final GlobalKey<AnimatedCircularChartState> _chartKey =
+  new GlobalKey<AnimatedCircularChartState>();
+
+  final _chartSize = const Size(250.0, 250.0);
   Color labelColor = Colors.blue;
 
   String elapsedTime = "";
 
   @override
   Widget build(BuildContext context) {
-    TextStyle _labelStyle = Theme.of(context)
+    TextStyle _labelStyle = Theme
+        .of(context)
         .textTheme
         .title
         .merge(new TextStyle(color: labelColor));
@@ -45,10 +51,16 @@ class _MyHomePageState extends State<MyHomePage> {
         padding: EdgeInsets.all(20.0),
         child: new Column(
           children: <Widget>[
-            new Text(
-              elapsedTime,
-              style: new TextStyle(
-                fontSize: 25.0,
+            new Container(
+              child: new AnimatedCircularChart(
+                key: _chartKey,
+                size: _chartSize,
+                initialChartData: _generateChartData(0, 0),
+                chartType: CircularChartType.Radial,
+                edgeStyle: SegmentEdgeStyle.round,
+                percentageValues: true,
+                holeLabel: elapsedTime,
+                labelStyle: _labelStyle,
               ),
             ),
 
@@ -87,10 +99,37 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  List<CircularStackEntry> _generateChartData(int min, int second) {
+    double temp = second * 0.6;
+    double adjustedSecond = second + temp;
+
+    double tempMin = min * 0.6;
+    double adjustedMinutes = min + tempMin;
+
+    Color dialColor = Colors.blue;
+    labelColor = dialColor;
+    List<CircularStackEntry> data = [
+      new CircularStackEntry(
+          [new CircularSegmentEntry(adjustedSecond, dialColor)])
+    ];
+
+    if (min > 0) {
+      labelColor = Colors.green;
+      data.removeAt(0);
+      data.add(
+          new CircularStackEntry([new CircularSegmentEntry(adjustedSecond, dialColor)])
+      );
+      data.add(
+          new CircularStackEntry([new CircularSegmentEntry(adjustedMinutes, Colors.green)])
+      );
+    }
+
+    return data;
+  }
 
   startWatch() {
     watch.start();
-    timer = new Timer.periodic(new Duration(milliseconds: 100), updateTime);
+    timer = new Timer.periodic(new Duration(milliseconds: 1000), updateTime);
   }
 
   stopWatch() {
@@ -99,9 +138,21 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   updateTime(Timer timer) {
-    setState(() {
-      elapsedTime = transformMilliSeconds(watch.elapsedMilliseconds);
-    });
+    if (watch.isRunning) {
+      var milliseconds = watch.elapsedMilliseconds;
+      int hundreds = (milliseconds / 10).truncate();
+      int seconds = (hundreds / 100).truncate();
+      int minutes = (seconds / 60).truncate();
+      setState(() {
+        elapsedTime = transformMilliSeconds(watch.elapsedMilliseconds);
+        if( seconds > 59){
+          seconds = seconds - (59 * minutes);
+          seconds = seconds - minutes;
+        }
+        List<CircularStackEntry> data = _generateChartData(minutes, seconds);
+        _chartKey.currentState.updateData(data);
+      });
+    }
   }
 
   restartWatch() {
@@ -113,6 +164,8 @@ class _MyHomePageState extends State<MyHomePage> {
     var timeSoFar = watch.elapsedMilliseconds;
     setState(() {
       elapsedTime = transformMilliSeconds(timeSoFar);
+      List<CircularStackEntry> data = _generateChartData(0, 0);
+      _chartKey.currentState.updateData(data);
     });
   }
 
@@ -125,6 +178,6 @@ class _MyHomePageState extends State<MyHomePage> {
     String secondsStr = (seconds % 60).toString().padLeft(2, '0');
     String hundredsStr = (hundreds % 100).toString().padLeft(2, '0');
 
-    return "$minutesStr:$secondsStr:$hundredsStr";
+    return "$minutesStr:$secondsStr";
   }
 }
